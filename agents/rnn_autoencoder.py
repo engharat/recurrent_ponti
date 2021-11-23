@@ -25,6 +25,7 @@ from torch.utils.tensorboard import SummaryWriter
 from random import randint
 import pathlib
 import sys
+from sklearn import svm
 
 class RecurrentAEAgent(BaseAgent):
 
@@ -39,8 +40,8 @@ class RecurrentAEAgent(BaseAgent):
         print("Experiment n: "+str(self.seed))
         self.model = RecurrentAE(self.config)
         self.train_dataset = My(substract=False)
-        self.val_dataset = My('/home/user/Downloads/traindata_csv/Test_folder_traindata/normal',substract=False)
-        self.val_anomaly_dataset = My('/home/user/Downloads/traindata_csv/Test_folder_traindata/retrofitted',substract=False)
+        self.val_dataset = My('~/Downloads/traindata_csv/Test_folder_traindata/normal',substract=False)
+        self.val_anomaly_dataset = My('~/Downloads/traindata_csv/Test_folder_traindata/retrofitted',substract=False)
         self.train_dataloader = DataLoader(self.train_dataset,batch_size=8,shuffle=True,num_workers=8,drop_last=False)
         self.val_dataloader = DataLoader(self.val_dataset,batch_size=128,shuffle=False,num_workers=8,drop_last=False)
         self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=128,shuffle=False,num_workers=8,drop_last=False)
@@ -90,7 +91,7 @@ class RecurrentAEAgent(BaseAgent):
         self.load_checkpoint(self.config.checkpoint_file)
 
     def predict(self,dataset):
-        predictions, losses = [], []
+        gts, predictions, losses = [], [], []
         criterion = nn.L1Loss(reduction='mean').to(self.device)
         with torch.no_grad():
             self.model.eval()
@@ -102,12 +103,11 @@ class RecurrentAEAgent(BaseAgent):
 
                 loss = criterion(seq_pred, seq_true)
                 predictions.append(seq_pred.cpu().numpy().flatten())
+                gts.append(seq_true.cpu().numpy().flatten())
                 losses.append(loss.item())
-        return predictions, losses
+        return gts,predictions, losses
 
-    def thres(self):
-        preds,losses = self.predict(self.val_dataloader.dataset)
-        preds_anomaly,losses_anomaly = self.predict(self.val_anomaly_dataloader.dataset)
+    def thres(self,losses,losses_anomaly):
         while(True):
             threshold = float(input("Scrivere la threshold: "))
             correct = sum(l <= threshold for l in losses)
@@ -119,7 +119,7 @@ class RecurrentAEAgent(BaseAgent):
             print(f'Correct anomaly predictions: {correct}/{len(self.val_anomaly_dataset)}')
 
     def train(self):
-#        self.config.max_epoch = 1000
+        self.config.max_epoch = 1000
         for epoch in range(self.current_epoch, self.config.max_epoch):
 
             self.current_epoch = epoch
@@ -150,7 +150,32 @@ class RecurrentAEAgent(BaseAgent):
             if is_best:
                 self.best_valid = perf_valid.sum
             self.save_checkpoint(is_best=is_best)
-        self.thres()
+        correct_normal, correct_anomaly = 0, 0
+        #playing the SVM game
+        print("SVM training...")        
+        gts_normal, preds_normal,losses_normal = self.predict(self.val_dataloader.dataset)
+        gts_anomaly, preds_anomaly,losses_anomaly = self.predict(self.val_anomaly_dataloader.dataset)
+
+        diff_normal = [elem1-elem2 for elem1,elem2 in zip(gts_normal, preds_normal)]
+        label_normal = [0 for elem in diff_normal]
+        diff_anomaly = [elem1-elem2 for elem1,elem2 in zip(gts_anomaly, preds_anomaly)]
+        label_anomaly = [1 for elem in diff_anomaly]
+        X = np.asarray(diff_normal + diff_anomaly)
+        y = np.asarray(label_normal + label_anomaly)
+        clf = svm.SVC()
+        clf.fit(X, y)
+        for elem,gt in zip(diff_normal,label_normal):
+            svm_pred = clf.predict(elem[None,...])
+            correct_normal += (gt == svm_pred).sum()
+        print(f'SVM Correct normal : {correct_normal}/{len(diff_normal)}')
+
+        for elem,gt in zip(diff_anomaly,label_anomaly):
+            svm_pred = clf.predict(elem[None,...])
+            correct_anomaly += (gt == svm_pred).sum()
+        print(f'SVM Correct anomaly : {correct_anomaly}/{len(diff_anomaly)}')
+        #playing the threshold game
+        self.thres(losses_normal,losses_anomaly)
+
     def train_one_epoch(self):
         """ One epoch training step """
 

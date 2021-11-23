@@ -24,8 +24,10 @@ STD = 0.02488539
 select_list = ['aBD11Az']
 class My(Dataset):
 
-    def __init__(self, base_folder="/home/user/Downloads/traindata_csv/Train_folder_traindata/",substract=False):
+    def __init__(self, base_folder="~/Downloads/traindata_csv/Train_folder_traindata/",substract=False):
+        base_folder = os.path.expanduser(base_folder)
         self.substract = substract
+        #import pdb; pdb.set_trace()
         self.data_paths = glob.glob(base_folder + "/**/*.csv", recursive = True)
         self.datas=[]
         self.max_seq_len = 32000

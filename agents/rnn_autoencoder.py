@@ -28,6 +28,7 @@ import sys
 from sklearn import svm
 import seaborn as sns
 import matplotlib.pyplot as plt
+import matplotlib
 
 sns.set(style='white', context='notebook', rc={'figure.figsize':(14,10)})
 
@@ -47,7 +48,7 @@ class RecurrentAEAgent(BaseAgent):
         self.train_dataset = KW51(substract=False)
         self.val_dataset = KW51('~/Downloads/traindata_csv/Test_folder_traindata/normal',substract=False)
         self.val_anomaly_dataset = KW51('~/Downloads/traindata_csv/Test_folder_traindata/retrofitted',substract=False)
-        self.train_dataloader = DataLoader(self.train_dataset,batch_size=8,shuffle=True,num_workers=8,drop_last=False)
+        self.train_dataloader = DataLoader(self.train_dataset,batch_size=8,shuffle=True,num_workers=0,drop_last=False)
         self.val_dataloader = DataLoader(self.val_dataset,batch_size=8,shuffle=False,num_workers=8,drop_last=False)
         self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=8,shuffle=False,num_workers=8,drop_last=False)
 
@@ -112,7 +113,6 @@ class RecurrentAEAgent(BaseAgent):
             print(f'Correct anomaly predictions: {correct}/{len(self.val_anomaly_dataset)}')
 
     def train(self):
-        self.config.max_epoch = 5
         for epoch in range(self.current_epoch, self.config.max_epoch):
             self.current_epoch = epoch
             # Training epoch
@@ -231,7 +231,7 @@ class RecurrentAEAgent(BaseAgent):
         epoch_loss = AverageMeter()
         with torch.no_grad():
 
-            seq_true = self.val_dataloader.dataset[1]
+            seq_true = self.val_dataloader.dataset[0]
             seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)
@@ -241,7 +241,7 @@ class RecurrentAEAgent(BaseAgent):
 
 
 
-            seq_true = self.val_anomaly_dataloader.dataset[1]
+            seq_true = self.val_anomaly_dataloader.dataset[0]
             seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)

@@ -31,7 +31,7 @@ class KW51(Dataset):
         self.data_paths = glob.glob(base_folder + "/**/*.csv", recursive = True)
         self.datas=[]
         self.max_seq_len = 32000
-        self.decimate_factor = 100
+        self.decimate_factor = 1000
         self.decimater = kazane.Decimate(self.decimate_factor)
 
         for i in range(len(self.data_paths)):

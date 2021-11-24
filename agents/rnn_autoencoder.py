@@ -110,35 +110,26 @@ class RecurrentAEAgent(BaseAgent):
     def train(self):
         self.config.max_epoch = 1000
         for epoch in range(self.current_epoch, self.config.max_epoch):
-
             self.current_epoch = epoch
-
             # Training epoch
-            if self.config.training_type == "one_class":
-                perf_train = self.train_one_epoch()
-                self.train_loss = np.append(self.train_loss, perf_train[0].avg)
-                if self.current_epoch % 10 ==0:
-                    print('Training loss at epoch ' + str(self.current_epoch) + ' is ' + str(perf_train[0].avg))
-            else:
-                perf_train, perf_train_parz = self.train_one_epoch()
-                self.train_loss = np.append(self.train_loss, perf_train.avg)
-                self.train_loss_parz = np.append(self.train_loss_parz, perf_train_parz.avg)
-                print('Training loss at epoch ' + str(self.current_epoch) + ' is ' + str(perf_train.avg))
-                print('Training loss parz at epoch ' + str(self.current_epoch) + ' is ' + str(perf_train_parz.avg))
+            perf_train = self.train_one_epoch()
+            self.train_loss = np.append(self.train_loss, perf_train[0].avg)
+            if self.current_epoch % 10 ==0:
+                print('Training loss at epoch ' + str(self.current_epoch) + ' is ' + str(perf_train[0].avg))
 
-            # Validation
-#            perf_valid = self.validate_one_epoch()
-#            self.valid_loss = np.append(self.valid_loss, perf_valid.avg)
-#            if self.current_epoch % 10 ==0:
-#                print('Validation loss at epoch ' + str(self.current_epoch) + ' is ' + str(perf_valid.avg))
-#            sys.stdout.write("\x1b[1A\x1b[2K") # move up cursor and delete whole line
-            sys.stdout.write("\x1b[1A\x1b[2K") # move up cursor and delete whole line
-            
-            # Saving
- #           is_best = perf_valid.sum < self.best_valid
- #           if is_best:
- #               self.best_valid = perf_valid.sum
- #           self.save_checkpoint(is_best=is_best)
+            if self.current_epoch % 10 ==0:
+                # Validation
+                perf_valid = self.validate_one_epoch()
+                self.valid_loss = np.append(self.valid_loss, perf_valid.avg)
+                if self.current_epoch % 10 ==0:
+                    print('Validation loss at epoch ' + str(self.current_epoch) + ' is ' + str(perf_valid.avg))
+                sys.stdout.write("\x1b[1A\x1b[2K") # move up cursor and delete whole line
+                sys.stdout.write("\x1b[1A\x1b[2K") # move up cursor and delete whole line
+                # Saving
+                is_best = perf_valid.sum < self.best_valid
+                if is_best:
+                    self.best_valid = perf_valid.sum
+                self.save_checkpoint(is_best=is_best)
 
         correct_normal, correct_anomaly = 0, 0
         #playing the SVM game

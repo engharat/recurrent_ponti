@@ -22,7 +22,7 @@ STD = 0.02488539
 ################################ Dataset ########################
 select_list = ['aBD11Az','aBD17Ay','aBD17Az','aBD17Cz','aBD23Ay','aBD23Az']
 #select_list = ['aBD11Az']
-class My(Dataset):
+class KW51(Dataset):
 
     def __init__(self, base_folder="~/Downloads/traindata_csv/Train_folder_traindata/",substract=False):
         base_folder = os.path.expanduser(base_folder)

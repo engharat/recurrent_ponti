@@ -19,7 +19,7 @@ from graphs.losses.MAEAUCLoss import MAEAUCLoss
 from graphs.losses.MSEAUCLoss import MSEAUCLoss
 from graphs.losses.MAELoss import MAELoss
 from graphs.losses.MSELoss import MSELoss
-from Datasets import My
+from Datasets import KW51
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from random import randint
@@ -31,8 +31,7 @@ class RecurrentAEAgent(BaseAgent):
 
     def __init__(self, config):
         super().__init__(config)
-        self.device = torch.device('cpu')
-        #torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+        self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
          # Create an instance from the Model
         self.seed = randint(0,1000)
@@ -41,9 +40,9 @@ class RecurrentAEAgent(BaseAgent):
         self.writer = SummaryWriter(self.exper_path)
         print("Experiment n: "+str(self.seed))
         self.model = RecurrentAE(self.config,self.device)
-        self.train_dataset = My(substract=False)
-        self.val_dataset = My('~/Downloads/traindata_csv/Test_folder_traindata/normal',substract=False)
-        self.val_anomaly_dataset = My('~/Downloads/traindata_csv/Test_folder_traindata/retrofitted',substract=False)
+        self.train_dataset = KW51(substract=False)
+        self.val_dataset = KW51('~/Downloads/traindata_csv/Test_folder_traindata/normal',substract=False)
+        self.val_anomaly_dataset = KW51('~/Downloads/traindata_csv/Test_folder_traindata/retrofitted',substract=False)
         self.train_dataloader = DataLoader(self.train_dataset,batch_size=8,shuffle=True,num_workers=8,drop_last=False)
         self.val_dataloader = DataLoader(self.val_dataset,batch_size=8,shuffle=False,num_workers=8,drop_last=False)
         self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=8,shuffle=False,num_workers=8,drop_last=False)

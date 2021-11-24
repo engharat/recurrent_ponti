@@ -1,10 +1,9 @@
 easydict==1.9
-matplotlib==3.3.4
-numpy==1.19.5
+kazane==1.0.1
+numpy==1.21.4
 pandas==1.1.5
-requests==2.25.1
-scikit-learn==0.24.1
-seaborn==0.11.1
-torch==1.8.1
-tqdm==4.60.0
-zipfile36==0.1.3
+requests==2.24.0
+scikit_learn==1.0.1
+torch==1.9.0+cu111
+torchvision==0.10.0+cu111
+tqdm==4.58.0

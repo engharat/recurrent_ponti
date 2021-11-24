@@ -34,7 +34,6 @@ class RecurrentDecoder(nn.Module):
     def forward(self, h_0, seq_len):
         # Initialize output
         x = torch.tensor([], device = self.device)
-
         # Squeezing
         h_i = h_0.squeeze(0)
 
@@ -83,7 +82,7 @@ class RecurrentDecoderLSTM(nn.Module):
 class RecurrentAE(nn.Module):
     """Recurrent autoencoder"""
 
-    def __init__(self, config):
+    def __init__(self, config,device):
         super().__init__()
 
         # Encoder and decoder configuration
@@ -92,7 +91,7 @@ class RecurrentAE(nn.Module):
         self.decoder = self.get_decoder(self.config.rnn_type)
         self.latent_dim = self.config.latent_dim
         self.n_features = self.config.n_features
-        self.device = self.config.device
+        self.device = device
 
         # Encoder and decoder
         self.encoder = RecurrentEncoder(self.n_features, self.latent_dim, self.rnn)

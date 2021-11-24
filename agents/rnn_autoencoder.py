@@ -43,8 +43,8 @@ class RecurrentAEAgent(BaseAgent):
         self.val_dataset = My('~/Downloads/traindata_csv/Test_folder_traindata/normal',substract=False)
         self.val_anomaly_dataset = My('~/Downloads/traindata_csv/Test_folder_traindata/retrofitted',substract=False)
         self.train_dataloader = DataLoader(self.train_dataset,batch_size=8,shuffle=True,num_workers=8,drop_last=False)
-        self.val_dataloader = DataLoader(self.val_dataset,batch_size=128,shuffle=False,num_workers=8,drop_last=False)
-        self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=128,shuffle=False,num_workers=8,drop_last=False)
+        self.val_dataloader = DataLoader(self.val_dataset,batch_size=8,shuffle=False,num_workers=8,drop_last=False)
+        self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=8,shuffle=False,num_workers=8,drop_last=False)
 
          # Create instance from the loss
         self.loss = {'MSE': MSELoss(),
@@ -67,22 +67,11 @@ class RecurrentAEAgent(BaseAgent):
         self.train_loss = np.array([], dtype = np.float64)
         self.train_loss_parz = np.array([], dtype=np.float64)
         self.valid_loss = np.array([], dtype = np.float64)
-
+        self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         # Check is cuda is available or not
         self.is_cuda = torch.cuda.is_available()
         # Construct the flag and make sure that cuda is available
         self.cuda = self.is_cuda & self.config.cuda
-
-        if self.cuda:
-            self.device = torch.device("cuda")
-            torch.cuda.manual_seed_all(self.config.seed)
-            torch.cuda.set_device(self.config.gpu_device)
-            print("Operation will be on *****GPU-CUDA***** ")
-            #print_cuda_statistics()
-        else:
-            self.device = torch.device("cpu")
-            torch.manual_seed(self.config.seed)
-            print("Operation will be on *****CPU***** ")
 
         self.model = self.model.to(self.device)
         self.loss = self.loss.to(self.device)
@@ -138,18 +127,19 @@ class RecurrentAEAgent(BaseAgent):
                 print('Training loss parz at epoch ' + str(self.current_epoch) + ' is ' + str(perf_train_parz.avg))
 
             # Validation
-            perf_valid = self.validate_one_epoch()
-            self.valid_loss = np.append(self.valid_loss, perf_valid.avg)
-            if self.current_epoch % 10 ==0:
-                print('Validation loss at epoch ' + str(self.current_epoch) + ' is ' + str(perf_valid.avg))
-            sys.stdout.write("\x1b[1A\x1b[2K") # move up cursor and delete whole line
+#            perf_valid = self.validate_one_epoch()
+#            self.valid_loss = np.append(self.valid_loss, perf_valid.avg)
+#            if self.current_epoch % 10 ==0:
+#                print('Validation loss at epoch ' + str(self.current_epoch) + ' is ' + str(perf_valid.avg))
+#            sys.stdout.write("\x1b[1A\x1b[2K") # move up cursor and delete whole line
             sys.stdout.write("\x1b[1A\x1b[2K") # move up cursor and delete whole line
             
             # Saving
-            is_best = perf_valid.sum < self.best_valid
-            if is_best:
-                self.best_valid = perf_valid.sum
-            self.save_checkpoint(is_best=is_best)
+ #           is_best = perf_valid.sum < self.best_valid
+ #           if is_best:
+ #               self.best_valid = perf_valid.sum
+ #           self.save_checkpoint(is_best=is_best)
+
         correct_normal, correct_anomaly = 0, 0
         #playing the SVM game
         print("SVM training...")        
@@ -176,6 +166,15 @@ class RecurrentAEAgent(BaseAgent):
         #playing the threshold game
         self.thres(losses_normal,losses_anomaly)
 
+        try:
+            import umap
+            import umap.plot
+            import pdb; pdb.set_trace()
+            mapper = umap.UMAP().fit(X)
+            umap.plot.points(mapper,labels=y)
+        except:
+            pass
+
     def train_one_epoch(self):
         """ One epoch training step """
 
@@ -192,8 +191,7 @@ class RecurrentAEAgent(BaseAgent):
 
         # One epoch of training
         for x in tqdm_batch: 
-            if self.cuda:
-                x = x.cuda()
+            x = x.to(self.device)
                 
             # Model
             x_hat = self.model(x)
@@ -232,7 +230,7 @@ class RecurrentAEAgent(BaseAgent):
         with torch.no_grad():
 
             seq_true = self.val_dataloader.dataset[1]
-            seq_true = seq_true[None,...].cuda()
+            seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)
             for i in range(seq_true.shape[1]):
@@ -242,7 +240,7 @@ class RecurrentAEAgent(BaseAgent):
 
 
             seq_true = self.val_anomaly_dataloader.dataset[1]
-            seq_true = seq_true[None,...].cuda()
+            seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)
             for i in range(seq_true.shape[1]):
@@ -252,8 +250,7 @@ class RecurrentAEAgent(BaseAgent):
             self.writer.flush()
 
             for x in tqdm_batch:
-                if self.cuda:
-                    x = x.cuda()
+                x = x.to(self.device)
                 # Model
                 x_hat = self.model(x)
                 

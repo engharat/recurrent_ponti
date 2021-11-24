@@ -26,6 +26,10 @@ from random import randint
 import pathlib
 import sys
 from sklearn import svm
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+sns.set(style='white', context='notebook', rc={'figure.figsize':(14,10)})
 
 class RecurrentAEAgent(BaseAgent):
 
@@ -108,7 +112,7 @@ class RecurrentAEAgent(BaseAgent):
             print(f'Correct anomaly predictions: {correct}/{len(self.val_anomaly_dataset)}')
 
     def train(self):
-        self.config.max_epoch = 1000
+        self.config.max_epoch = 5
         for epoch in range(self.current_epoch, self.config.max_epoch):
             self.current_epoch = epoch
             # Training epoch
@@ -154,17 +158,24 @@ class RecurrentAEAgent(BaseAgent):
             svm_pred = clf.predict(elem[None,...])
             correct_anomaly += (gt == svm_pred).sum()
         print(f'SVM Correct anomaly : {correct_anomaly}/{len(diff_anomaly)}')
+
+        import umap
+        fig = plt.figure(figsize=(8,8))
+        colors = ['red','blue']
+        umap_2d = umap.UMAP(n_components=2, init='random', random_state=0)
+        proj_2d = umap_2d.fit_transform(X)
+        plt.scatter(proj_2d[:,0], proj_2d[:,1], c=y, cmap=matplotlib.colors.ListedColormap(colors))
+        cb = plt.colorbar()
+        loc = np.arange(0,max(y),max(y)/float(len(colors)))
+        cb.set_ticks(loc)
+        cb.set_ticklabels(colors)
+        self.writer.add_figure('figure',fig)
+        self.writer.flush()
+        #except:
+        #    pass
+
         #playing the threshold game
         self.thres(losses_normal,losses_anomaly)
-
-        try:
-            import umap
-            import umap.plot
-            import pdb; pdb.set_trace()
-            mapper = umap.UMAP().fit(X)
-            umap.plot.points(mapper,labels=y)
-        except:
-            pass
 
     def train_one_epoch(self):
         """ One epoch training step """

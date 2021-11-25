@@ -48,10 +48,10 @@ class RecurrentAEAgent(BaseAgent):
         self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False)
         self.val_dataset = KW51('~/Downloads/ambient_csv/test/normal',substract=False)
         self.val_anomaly_dataset = KW51('~/Downloads/ambient_csv/test/anomaly',substract=False)
-        self.train_dataloader = DataLoader(self.train_dataset,batch_size=32,shuffle=True,num_workers=0,drop_last=False)
-        self.val_dataloader = DataLoader(self.val_dataset,batch_size=32,shuffle=False,num_workers=8,drop_last=False)
-        self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=32,shuffle=False,num_workers=8,drop_last=False)
-
+        self.train_dataloader = DataLoader(self.train_dataset,batch_size=config.batch_size,shuffle=True,num_workers=0,drop_last=False)
+        self.val_dataloader = DataLoader(self.val_dataset,batch_size=config.batch_size,shuffle=False,num_workers=0,drop_last=False)
+        self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=config.batch_size,shuffle=False,num_workers=0,drop_last=False)
+        self.split_size = config.split_size
          # Create instance from the loss
         self.loss = {'MSE': MSELoss(),
                      'MAE': MAELoss(),
@@ -193,26 +193,19 @@ class RecurrentAEAgent(BaseAgent):
         epoch_loss_parz = AverageMeter()
 
         # One epoch of training
-        for x in tqdm_batch: 
-            x = x.to(self.device)
-                
-            # Model
-            x_hat = self.model(x)
-
-            # Current training loss
-            if self.config.training_type == "one_class":
+        for x_seq in tqdm_batch: 
+            for x in torch.split(x_seq,self.split_size,1):
+                x = x.to(self.device)
+                # Model
+                x_hat = self.model(x)
                 cur_tr_loss = self.loss(x, x_hat)
            
-            if np.isnan(float(cur_tr_loss.item())):
-                raise ValueError('Loss is nan during training...')
+                # Optimizer
+                self.optimizer.zero_grad()
+                cur_tr_loss.backward()
+                self.optimizer.step()
 
-            # Optimizer
-            self.optimizer.zero_grad()
-            cur_tr_loss.backward()
-            self.optimizer.step()
-
-            # Updating loss
-            if self.config.training_type == "one_class":
+                # Updating loss
                 epoch_loss.update(cur_tr_loss.item())
 
         tqdm_batch.close()

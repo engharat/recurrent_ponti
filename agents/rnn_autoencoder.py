@@ -45,12 +45,12 @@ class RecurrentAEAgent(BaseAgent):
         self.writer = SummaryWriter(self.exper_path)
         print("Experiment n: "+str(self.seed))
         self.model = RecurrentAE(self.config,self.device)
-        self.train_dataset = KW51(substract=False)
-        self.val_dataset = KW51('~/Downloads/traindata_csv/Test_folder_traindata/normal',substract=False)
-        self.val_anomaly_dataset = KW51('~/Downloads/traindata_csv/Test_folder_traindata/retrofitted',substract=False)
-        self.train_dataloader = DataLoader(self.train_dataset,batch_size=8,shuffle=True,num_workers=0,drop_last=False)
-        self.val_dataloader = DataLoader(self.val_dataset,batch_size=8,shuffle=False,num_workers=8,drop_last=False)
-        self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=8,shuffle=False,num_workers=8,drop_last=False)
+        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False)
+        self.val_dataset = KW51('~/Downloads/ambient_csv/test/normal',substract=False)
+        self.val_anomaly_dataset = KW51('~/Downloads/ambient_csv/test/anomaly',substract=False)
+        self.train_dataloader = DataLoader(self.train_dataset,batch_size=32,shuffle=True,num_workers=0,drop_last=False)
+        self.val_dataloader = DataLoader(self.val_dataset,batch_size=32,shuffle=False,num_workers=8,drop_last=False)
+        self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=32,shuffle=False,num_workers=8,drop_last=False)
 
          # Create instance from the loss
         self.loss = {'MSE': MSELoss(),
@@ -136,6 +136,7 @@ class RecurrentAEAgent(BaseAgent):
                 self.save_checkpoint(is_best=is_best)
 
         correct_normal, correct_anomaly = 0, 0
+        import pdb;pdb.set_trace()
         #playing the SVM game
         print("SVM training...")        
         gts_normal, preds_normal,losses_normal = self.predict(self.val_dataloader.dataset)

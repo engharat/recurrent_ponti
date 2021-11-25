@@ -1,3 +1,4 @@
+
 import os.path
 import os
 from os import path
@@ -24,16 +25,16 @@ select_list = ['aBD11Az','aBD17Ay','aBD17Az','aBD17Cz','aBD23Ay','aBD23Az']
 #select_list = ['aBD11Az']
 class KW51(Dataset):
 
-    def __init__(self, base_folder="~/Downloads/traindata_csv/Train_folder_traindata/",substract=False):
+    def __init__(self, base_folder="~/Downloads/traindata_csv/Train_folder_traindata/",substract=False,max_seq_len=32000,decimate_factor=100):
         base_folder = os.path.expanduser(base_folder)
         self.substract = substract
         #import pdb; pdb.set_trace()
         self.data_paths = glob.glob(base_folder + "/**/*.csv", recursive = True)
         self.datas=[]
-        self.max_seq_len = 32000
-        self.decimate_factor = 1000
+        self.max_seq_len = max_seq_len
+        self.decimate_factor = decimate_factor
         self.decimater = kazane.Decimate(self.decimate_factor)
-
+        max_length = 0
         for i in range(len(self.data_paths)):
             df = pd.read_csv(self.data_paths[i])
             df = df[select_list]
@@ -46,10 +47,13 @@ class KW51(Dataset):
                 data -= torch.roll(data, 1, 0)
                 data[0, :] = initial_values
             data = data * 10
+            if data.shape[0]>max_length : max_length = data.shape[0]
             self.datas.append(data)
-
+        indexes = [i for i,elem in enumerate(self.datas) if elem.shape[0] < max_length] #ho ottenuto così alcuni elementi che erano più corti e danno problemi al batch
+        for index in sorted(indexes, reverse=True): #li rimuovo
+            del self.datas[index]
         self.seq_len, self.n_features = self.datas[0].shape
-
+        self.n_samples = len(self.datas)
         #self.seq_len = 100
         #self.n_features = 1
 
@@ -68,7 +72,7 @@ class KW51(Dataset):
         # std = tmp.std()
 
     def __len__(self):
-        return len(self.data_paths)
+        return len(self.datas)
 
     def __getitem2__(self, i):
         signal=[np.sin(2*np.pi*i/10) for i in np.arange(0,100,1)]

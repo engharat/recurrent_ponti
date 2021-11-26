@@ -5,6 +5,7 @@ from os import path
 from csv import writer
 from csv import reader
 import pathlib
+from torch.serialization import save
 from tqdm import tqdm
 import os
 import torch
@@ -20,6 +21,9 @@ import glob
 import kazane
 MEAN =1.2279458e-08
 STD = 0.02488539
+STD=torch.FloatTensor([0.0020, 0.0010, 0.0012, 0.0011, 0.0009, 0.0022])
+MEAN=torch.FloatTensor([ 6.1557e-06, -6.0278e-07,  7.3163e-06,  1.0190e-06, -3.7250e-07,-1.1097e-08])
+
 ################################ Dataset ########################
 select_list = ['aBD11Az','aBD17Ay','aBD17Az','aBD17Cz','aBD23Ay','aBD23Az']
 #select_list = ['aBD11Az']
@@ -34,51 +38,45 @@ class KW51(Dataset):
         self.max_seq_len = max_seq_len
         self.decimate_factor = decimate_factor
         self.decimater = kazane.Decimate(self.decimate_factor)
+        self.mean = MEAN[0:len(select_list)]
+        self.std = STD[0:len(select_list)]
         max_length = 0
-        for i in range(len(self.data_paths)):
-            df = pd.read_csv(self.data_paths[i])
-            df = df[select_list]
-            data =  torch.from_numpy(np.nan_to_num(df.astype(np.float32).to_numpy()))
-            data = data[0:self.max_seq_len, :]
-            data = self.decimater(data.T).T
-            data = (data - MEAN) / STD
-            if self.substract:
-                initial_values = data[0, :].clone()
-                data -= torch.roll(data, 1, 0)
-                data[0, :] = initial_values
-            data = data * 10
-            if data.shape[0]>max_length : max_length = data.shape[0]
-            self.datas.append(data)
-        indexes = [i for i,elem in enumerate(self.datas) if elem.shape[0] < max_length] #ho ottenuto così alcuni elementi che erano più corti e danno problemi al batch
-        for index in sorted(indexes, reverse=True): #li rimuovo
-            del self.datas[index]
-        self.seq_len, self.n_features = self.datas[0].shape
-        self.n_samples = len(self.datas)
-        #self.seq_len = 100
-        #self.n_features = 1
-
-        # tmp = []
-        # for path in self.data_paths:
-        #     df = pd.read_csv(path)
-        #     df = df[select_list]
-        #     data =  torch.from_numpy(np.nan_to_num(df.astype(np.float32).to_numpy()))
-        #     data = data[0:self.max_seq_len, :]
-        #     data = self.decimater(data.T).T
-        #     data = data.numpy()
-        #     tmp.append(data)
-        # import pdb; pdb.set_trace()
-        # tmp = np.asarray(tmp)
-        # mean = tmp.mean()
-        # std = tmp.std()
+        if 'train' in base_folder:
+            saved_file = 'train.pt'
+        if 'normal' in base_folder:
+            saved_file = 'normal.pt'
+        if 'anomaly' in base_folder:
+            saved_file = 'anomaly.pt'
+        if not os.path.exists(saved_file):
+            print("LOADING AND PROCESSING DATA...")
+            for i in tqdm(range(len(self.data_paths))):
+                df = pd.read_csv(self.data_paths[i])
+                df = df[select_list]
+                data =  torch.from_numpy(np.nan_to_num(df.astype(np.float32).to_numpy()))
+                data = data[0:self.max_seq_len, :]
+                data = self.decimater(data.T).T
+                #data = (data - MEAN) / STD
+                if self.substract:
+                    initial_values = data[0, :].clone()
+                    data -= torch.roll(data, 1, 0)
+                    data[0, :] = initial_values
+                #data = data * 10
+                if data.shape[0]>max_length : max_length = data.shape[0]
+                self.datas.append(data)
+            indexes = [i for i,elem in enumerate(self.datas) if elem.shape[0] < max_length] #ho ottenuto così alcuni elementi che erano più corti e danno problemi al batch
+            for index in sorted(indexes, reverse=True): #li rimuovo
+                del self.datas[index]
+            self.datas = torch.stack([elem for elem in self.datas])
+            self.datas = (self.datas - self.mean) / self.std
+            torch.save(self.datas,saved_file)
+            print("SAVING FILE: "+saved_file)
+        else:
+            print("LOADING SAVED FILE: "+saved_file)
+            self.datas = torch.load(saved_file)
+        self.n_samples,self.seq_len, self.n_features = self.datas.shape
 
     def __len__(self):
-        return len(self.datas)
-
-    def __getitem2__(self, i):
-        signal=[np.sin(2*np.pi*i/10) for i in np.arange(0,100,1)]
-        aa = np.asarray(signal)
-        bb = torch.from_numpy(aa).view(-1,1).float()
-        return bb
+        return self.n_samples
 
     def __getitem__(self, i):
-        return self.datas[i]
+        return self.datas[i,:,:]

@@ -224,24 +224,33 @@ class RecurrentAEAgent(BaseAgent):
         # Initialize your average meters
         epoch_loss = AverageMeter()
         with torch.no_grad():
+            plot_feat = 5
 
-            seq_true = self.val_dataloader.dataset[0]
+            seq_true = self.train_dataloader.dataset[10]
             seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)
             for i in range(seq_true.shape[1]):
-                self.writer.add_scalars('1', {'seq_true':seq_true[0,i,0],'seq_pred':seq_pred[0,i,0],'seq_diff':seq_diff[0,i,0]}, i)
-            self.writer.add_scalars('mean1', {'seq_diff_mean':seq_diff[0,:,0].mean()}, self.current_epoch)
+                self.writer.add_scalars('train', {'seq_true':seq_true[0,i,plot_feat],'seq_pred':seq_pred[0,i,plot_feat]}, i)
+            self.writer.add_scalars('mean_train', {'seq_diff_mean':seq_diff[0,:,:].mean()}, self.current_epoch)
 
-
-
-            seq_true = self.val_anomaly_dataloader.dataset[0]
+            seq_true = self.val_dataloader.dataset[10]
             seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)
             for i in range(seq_true.shape[1]):
-                self.writer.add_scalars('2', {'anom_true':seq_true[0,i,0],'anom_pred':seq_pred[0,i,0],'anom_diff':seq_diff[0,i,0]}, i)
-            self.writer.add_scalars('mean2', {'anom_diff_mean':seq_diff[0,:,0].mean()}, self.current_epoch)
+                self.writer.add_scalars('val_norm', {'seq_true':seq_true[0,i,plot_feat],'seq_pred':seq_pred[0,i,plot_feat]}, i)
+            self.writer.add_scalars('mean_val_norm', {'seq_diff_mean':seq_diff[0,:,:].mean()}, self.current_epoch)
+
+
+
+            seq_true = self.val_anomaly_dataloader.dataset[10]
+            seq_true = seq_true[None,...].to(self.device)
+            seq_pred = self.model(seq_true)
+            seq_diff = torch.abs(seq_pred - seq_true)
+            for i in range(seq_true.shape[1]):
+                self.writer.add_scalars('val_anom', {'anom_true':seq_true[0,i,plot_feat],'anom_pred':seq_pred[0,i,plot_feat]}, i)
+            self.writer.add_scalars('mean_val_anom', {'anom_diff_mean':seq_diff[0,:,:].mean()}, self.current_epoch)
 
             self.writer.flush()
 
@@ -249,14 +258,8 @@ class RecurrentAEAgent(BaseAgent):
                 x = x.to(self.device)
                 # Model
                 x_hat = self.model(x)
-                
                 # Current training loss
-                if self.config.training_type == "one_class":
-                    cur_val_loss = self.loss(x, x_hat)
-
-                if np.isnan(float(cur_val_loss.item())):
-                    raise ValueError('Loss is nan during validation...')
-
+                cur_val_loss = self.loss(x, x_hat)
                 # Updating loss
                 epoch_loss.update(cur_val_loss.item())
 

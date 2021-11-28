@@ -45,9 +45,9 @@ class RecurrentAEAgent(BaseAgent):
         self.writer = SummaryWriter(self.exper_path)
         print("Experiment n: "+str(self.seed))
         self.model = RecurrentAE(self.config,self.device)
-        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False,decimate_factor=config.decimate_factor)
-        self.val_dataset = KW51('~/Downloads/ambient_csv/test/normal',substract=False,decimate_factor=config.decimate_factor)
-        self.val_anomaly_dataset = KW51('~/Downloads/ambient_csv/test/anomaly',substract=False,decimate_factor=config.decimate_factor)
+        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False,decimate_factor=config.decimate_factor,scaler=None)
+        self.val_dataset = KW51('~/Downloads/ambient_csv/test/normal',substract=False,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
+        self.val_anomaly_dataset = KW51('~/Downloads/ambient_csv/test/anomaly',substract=False,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
         self.train_dataloader = DataLoader(self.train_dataset,batch_size=config.batch_size,shuffle=True,num_workers=0,drop_last=False)
         self.val_dataloader = DataLoader(self.val_dataset,batch_size=config.batch_size,shuffle=False,num_workers=0,drop_last=False)
         self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=config.batch_size,shuffle=False,num_workers=0,drop_last=False)
@@ -115,13 +115,16 @@ class RecurrentAEAgent(BaseAgent):
     def train(self):
         for epoch in range(self.current_epoch, self.config.max_epoch):
             self.current_epoch = epoch
+            #validating before training
+            perf_valid = self.validate_one_epoch() if epoch == 0 else None
+
             # Training epoch
             perf_train = self.train_one_epoch()
             self.train_loss = np.append(self.train_loss, perf_train[0].avg)
             if self.current_epoch % 10 ==0:
                 print('Training loss at epoch ' + str(self.current_epoch) + ' is ' + str(perf_train[0].avg))
 
-            if self.current_epoch % 10 ==0:
+            if self.current_epoch % 10 == 0:
                 # Validation
                 perf_valid = self.validate_one_epoch()
                 self.valid_loss = np.append(self.valid_loss, perf_valid.avg)
@@ -136,7 +139,6 @@ class RecurrentAEAgent(BaseAgent):
                 self.save_checkpoint(is_best=is_best)
 
         correct_normal, correct_anomaly = 0, 0
-        import pdb;pdb.set_trace()
         #playing the SVM game
         print("SVM training...")        
         gts_normal, preds_normal,losses_normal = self.predict(self.val_dataloader.dataset)
@@ -225,9 +227,9 @@ class RecurrentAEAgent(BaseAgent):
         # Initialize your average meters
         epoch_loss = AverageMeter()
         with torch.no_grad():
-            plot_feat = 5
+            plot_feat = 0
 
-            seq_true = self.train_dataloader.dataset[10]
+            seq_true = self.train_dataloader.dataset[0]
             seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)
@@ -235,7 +237,7 @@ class RecurrentAEAgent(BaseAgent):
                 self.writer.add_scalars('train', {'seq_true':seq_true[0,i,plot_feat],'seq_pred':seq_pred[0,i,plot_feat]}, i)
             self.writer.add_scalars('mean_train', {'seq_diff_mean':seq_diff[0,:,:].mean()}, self.current_epoch)
 
-            seq_true = self.val_dataloader.dataset[10]
+            seq_true = self.val_dataloader.dataset[0]
             seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)
@@ -245,7 +247,7 @@ class RecurrentAEAgent(BaseAgent):
 
 
 
-            seq_true = self.val_anomaly_dataloader.dataset[10]
+            seq_true = self.val_anomaly_dataloader.dataset[0]
             seq_true = seq_true[None,...].to(self.device)
             seq_pred = self.model(seq_true)
             seq_diff = torch.abs(seq_pred - seq_true)

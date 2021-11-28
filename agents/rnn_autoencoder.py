@@ -193,20 +193,21 @@ class RecurrentAEAgent(BaseAgent):
         epoch_loss_parz = AverageMeter()
 
         # One epoch of training
-        for x_seq in tqdm_batch: 
-            for x in torch.split(x_seq,self.split_size,1):
-                x = x.to(self.device)
+        for x in tqdm_batch: 
+            #for x in torch.split(x_seq,self.split_size,1):
+
+            x = x.to(self.device)
                 # Model
-                x_hat = self.model(x)
-                cur_tr_loss = self.loss(x, x_hat)
+            x_hat = self.model(x)
+            cur_tr_loss = self.loss(x, x_hat)
            
                 # Optimizer
-                self.optimizer.zero_grad()
-                cur_tr_loss.backward()
-                self.optimizer.step()
+            self.optimizer.zero_grad()
+            cur_tr_loss.backward()
+            self.optimizer.step()
 
-                # Updating loss
-                epoch_loss.update(cur_tr_loss.item())
+            # Updating loss
+            epoch_loss.update(cur_tr_loss.item())
 
         tqdm_batch.close()
       

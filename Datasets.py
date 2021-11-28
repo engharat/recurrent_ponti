@@ -19,8 +19,14 @@ import random
 import torchvision.transforms.functional as TF
 import glob
 import kazane
-MEAN =1.2279458e-08
-STD = 0.02488539
+from sklearn.preprocessing import MinMaxScaler
+
+class MinMaxScaler3D(MinMaxScaler):
+
+    def fit_transform(self, X, y=None):
+        x = np.reshape(X, newshape=(X.shape[0]*X.shape[1], X.shape[2]))
+        return np.reshape(super().fit_transform(x, y=y), newshape=X.shape)
+
 STD=torch.FloatTensor([0.0020, 0.0010, 0.0012, 0.0011, 0.0009, 0.0022])
 MEAN=torch.FloatTensor([ 6.1557e-06, -6.0278e-07,  7.3163e-06,  1.0190e-06, -3.7250e-07,-1.1097e-08])
 
@@ -41,6 +47,8 @@ class KW51(Dataset):
         self.mean = MEAN[0:len(select_list)]
         self.std = STD[0:len(select_list)]
         max_length = 0
+        scaler = MinMaxScaler3D([-1,1])
+
         if 'train' in base_folder:
             saved_file = 'train.pt'
         if 'normal' in base_folder:
@@ -60,19 +68,23 @@ class KW51(Dataset):
                     initial_values = data[0, :].clone()
                     data -= torch.roll(data, 1, 0)
                     data[0, :] = initial_values
-                #data = data * 10
+
                 if data.shape[0]>max_length : max_length = data.shape[0]
                 self.datas.append(data)
             indexes = [i for i,elem in enumerate(self.datas) if elem.shape[0] < max_length] #ho ottenuto così alcuni elementi che erano più corti e danno problemi al batch
             for index in sorted(indexes, reverse=True): #li rimuovo
                 del self.datas[index]
             self.datas = torch.stack([elem for elem in self.datas])
-            self.datas = (self.datas - self.mean) / self.std
+            ##scaling
+            #self.datas = (self.datas - self.mean) / self.std
             torch.save(self.datas,saved_file)
             print("SAVING FILE: "+saved_file)
         else:
             print("LOADING SAVED FILE: "+saved_file)
             self.datas = torch.load(saved_file)
+
+        self.datas = torch.from_numpy(scaler.fit_transform(self.datas.numpy()))
+
         self.n_samples,self.seq_len, self.n_features = self.datas.shape
 
     def __len__(self):

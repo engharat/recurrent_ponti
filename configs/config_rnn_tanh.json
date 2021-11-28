@@ -1,4 +1,4 @@
-{"exp_name": "rnn_ae_ECG5000_exp_0", "agent": "RecurrentAEAgent", "rnn_type": "LSTM", "rnn_act": "tanh", "n_layers": 2, "latent_dim": 64, "n_features": 6,"decimate_factor": 1000,
+{"exp_name": "rnn_ae_ECG5000_exp_0", "agent": "RecurrentAEAgent", "rnn_type": "LSTM", "rnn_act": "tanh", "n_layers": 2, "latent_dim": 16, "n_features": 6,"decimate_factor": 1000,
 "split_size": 32, "learning_rate": 0.001, "batch_size": 64,  "max_epoch": 1000, "loss": "MAE", "lambda_auc": 0.1, "sampler_random_state": 88,
  "data_folder": "./data/ECG5000/numpy/", "X_train": "X_train.npy", "y_train": "y_train.npy", "X_train_p": "X_train_p.npy", "y_train_p": "y_train_p.npy",
  "X_val": "X_val.npy", "y_val": "y_val.npy", "X_test": "X_test.npy", "y_test": "y_test.npy", "X_val_p": "X_val_p.npy", "y_val_p": "y_val_p.npy",

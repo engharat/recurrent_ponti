@@ -29,8 +29,8 @@ valid_MAE_all
 valid_loss_all
 utils/data_preparation_old.py
 train.pt
-validation.pt
-test.pt
+anomaly.pt
+normal.pt
 # Env
 rnn_ae_env/*
 demo_env/*

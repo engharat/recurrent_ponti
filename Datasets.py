@@ -33,6 +33,10 @@ class Standard3D(StandardScaler):
         x = np.reshape(X, newshape=(X.shape[0]*X.shape[1], X.shape[2]))
         return np.reshape(super().fit_transform(x, y=y), newshape=X.shape)
 
+    def transform(self, X):
+        x = np.reshape(X, newshape=(X.shape[0]*X.shape[1], X.shape[2]))
+        return np.reshape(super().transform(x,copy=None), newshape=X.shape)
+
 STD=torch.FloatTensor([0.0020, 0.0010, 0.0012, 0.0011, 0.0009, 0.0022])
 MEAN=torch.FloatTensor([ 6.1557e-06, -6.0278e-07,  7.3163e-06,  1.0190e-06, -3.7250e-07,-1.1097e-08])
 
@@ -44,7 +48,6 @@ class KW51(Dataset):
     def __init__(self, base_folder="~/Downloads/traindata_csv/Train_folder_traindata/",substract=False,max_seq_len=32000,decimate_factor=100,scaler=None):
         base_folder = os.path.expanduser(base_folder)
         self.substract = substract
-        #import pdb; pdb.set_trace()
         self.data_paths = glob.glob(base_folder + "/**/*.csv", recursive = True)
         self.datas=[]
         self.max_seq_len = max_seq_len
@@ -53,7 +56,7 @@ class KW51(Dataset):
         self.mean = MEAN[0:len(select_list)]
         self.std = STD[0:len(select_list)]
         max_length = 0
-        self.scaler = Standard3D() if scaler is None else scaler
+        self.scaler = StandardScaler() if scaler is None else scaler
 
         if 'train' in base_folder:
             saved_file = 'train.pt'
@@ -88,10 +91,10 @@ class KW51(Dataset):
         else:
             print("LOADING SAVED FILE: "+saved_file)
             self.datas = torch.load(saved_file)
-
-        self.datas = torch.from_numpy(self.scaler.fit_transform(self.datas.numpy())) if scaler is None else torch.from_numpy(self.scaler.transform(self.datas.numpy()))
-
         self.n_samples,self.seq_len, self.n_features = self.datas.shape
+        self.datas = self.datas.view(-1,self.n_features)
+        self.datas = torch.from_numpy(self.scaler.fit_transform(self.datas.numpy())) if scaler is None else torch.from_numpy(self.scaler.transform(self.datas.numpy()))
+        self.datas = self.datas.view(self.n_samples,self.seq_len,self.n_features)
 
     def __len__(self):
         return self.n_samples

@@ -31,6 +31,8 @@ utils/data_preparation_old.py
 train.pt
 anomaly.pt
 normal.pt
+best_results/*
+compressed_data/*
 # Env
 rnn_ae_env/*
 demo_env/*

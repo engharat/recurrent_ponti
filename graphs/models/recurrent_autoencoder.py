@@ -55,11 +55,15 @@ class RecurrentEncoderConvLSTM(nn.Module):
 
     def __init__(self, n_features, latent_dim, rnn):
         super().__init__()
-        self.conv1 = nn.Conv1d(n_features,n_features,kernel_size=3,stride=2, padding=1,bias=True)#,dilation=3
         self.relu = nn.ReLU()
+        self.conv1 = nn.Conv1d(n_features,n_features,kernel_size=3,stride=2, padding=1,bias=True)
         self.conv2 = nn.Conv1d(n_features,n_features,kernel_size=3,stride=2, padding=1,bias=True)
         self.bn1 = nn.BatchNorm1d(n_features)
         self.bn2 = nn.BatchNorm1d(n_features)
+        self.conv3 = nn.Conv1d(n_features,n_features,kernel_size=3,stride=2, padding=1,bias=True)
+        self.conv4 = nn.Conv1d(n_features,n_features,kernel_size=3,stride=2, padding=1,bias=True)
+        self.bn3 = nn.BatchNorm1d(n_features)
+        self.bn4 = nn.BatchNorm1d(n_features)
         self.rec_enc1 = rnn(n_features, latent_dim, batch_first=True)
 
     def forward(self, x):
@@ -69,6 +73,11 @@ class RecurrentEncoderConvLSTM(nn.Module):
         x = self.bn1(self.relu(x))
         x = self.conv2(x)
         x = self.bn2(self.relu(x))
+
+        x = self.conv3(x)
+        x = self.bn3(self.relu(x))
+        x = self.conv4(x)
+        x = self.bn4(self.relu(x))
         x = x.swapaxes(1,2) #now we have bck on axis 0 the batch, on axis 1 the sequence and on axis 2 the features         
         seq_len = x.shape[1]
         _, h_n = self.rec_enc1(x)
@@ -88,7 +97,11 @@ class RecurrentDecoderConvLSTM(nn.Module):
         self.relu = nn.ReLU()
         self.deconv1 = nn.ConvTranspose1d(n_features,n_features,kernel_size=3,stride=2, padding=1,output_padding=1,bias=True)
         self.deconv2 = nn.ConvTranspose1d(n_features,n_features,kernel_size=3,stride=2, padding=1,output_padding=1,bias=True)
+        self.deconv3 = nn.ConvTranspose1d(n_features,n_features,kernel_size=3,stride=2, padding=1,output_padding=1,bias=True)
+        self.deconv4 = nn.ConvTranspose1d(n_features,n_features,kernel_size=3,stride=2, padding=1,output_padding=1,bias=True)
         self.bn1 = nn.BatchNorm1d(n_features)
+        self.bn2 = nn.BatchNorm1d(n_features)
+        self.bn3 = nn.BatchNorm1d(n_features)
 
     def forward(self, h_0, seq_len):
         # Initialize output
@@ -109,7 +122,14 @@ class RecurrentDecoderConvLSTM(nn.Module):
         x = x.swapaxes(1,2) #now we have on axis 0 the batch, on axis 1 the features and on axis 2 the sequence .
         x = self.deconv1(x)
         x = self.bn1(self.relu(x))
+
         x = self.deconv2(x)
+        x = self.bn2(self.relu(x))
+
+        x = self.deconv3(x)
+        x = self.bn3(self.relu(x))
+
+        x = self.deconv4(x)
         x = x.swapaxes(1,2) #now we have bck on axis 0 the batch, on axis 1 the  and on axis 2 the sequencefeatures 
         return x
 class RecurrentDecoderLSTM(nn.Module):

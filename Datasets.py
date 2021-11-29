@@ -45,7 +45,7 @@ select_list = ['aBD11Az','aBD17Ay','aBD17Az','aBD17Cz','aBD23Ay','aBD23Az']
 #select_list = ['aBD11Az']
 class KW51(Dataset):
 
-    def __init__(self, base_folder="~/Downloads/traindata_csv/Train_folder_traindata/",substract=False,max_seq_len=32000,decimate_factor=100,scaler=None):
+    def __init__(self, base_folder="~/Downloads/traindata_csv/Train_folder_traindata/",substract=False,max_seq_len=31744,decimate_factor=100,scaler=None):
         base_folder = os.path.expanduser(base_folder)
         self.substract = substract
         self.data_paths = glob.glob(base_folder + "/**/*.csv", recursive = True)

@@ -29,6 +29,7 @@ from sklearn import svm
 import seaborn as sns
 import matplotlib.pyplot as plt
 import matplotlib
+from torchinfo import summary
 
 sns.set(style='white', context='notebook', rc={'figure.figsize':(14,10)})
 
@@ -45,7 +46,7 @@ class RecurrentAEAgent(BaseAgent):
         self.writer = SummaryWriter(self.exper_path)
         print("Experiment n: "+str(self.seed))
         self.model = RecurrentAE(self.config,self.device)
-        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False,decimate_factor=config.decimate_factor,scaler=None)
+        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False,decimate_factor=config.decimate_factor,scaler=None,data_aug=True)
         self.val_dataset = KW51('~/Downloads/ambient_csv/test/normal',substract=False,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
         self.val_anomaly_dataset = KW51('~/Downloads/ambient_csv/test/anomaly',substract=False,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
         self.train_dataloader = DataLoader(self.train_dataset,batch_size=config.batch_size,shuffle=True,num_workers=0,drop_last=False)
@@ -79,6 +80,7 @@ class RecurrentAEAgent(BaseAgent):
         self.cuda = self.is_cuda & self.config.cuda
 
         self.model = self.model.to(self.device)
+        summary(self.model, input_size=(config.batch_size,self.train_dataset[0].shape[0],self.train_dataset[0].shape[1]))
         self.loss = self.loss.to(self.device)
 
         # Loading chekpoint

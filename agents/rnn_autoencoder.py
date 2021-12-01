@@ -14,7 +14,7 @@ from agents.base import BaseAgent
 from utils.metrics import AverageMeter
 from utils.checkpoints import checkpoints_folder
 from utils.config import save_config
-from graphs.models.recurrent_autoencoder import RecurrentAE
+from graphs.models.recurrent_autoencoder import RecurrentAE, TransformerAE
 from graphs.losses.MAEAUCLoss import MAEAUCLoss
 from graphs.losses.MSEAUCLoss import MSEAUCLoss
 from graphs.losses.MAELoss import MAELoss
@@ -45,8 +45,12 @@ class RecurrentAEAgent(BaseAgent):
         pathlib.Path(self.exper_path).mkdir(parents=True,exist_ok=True)
         self.writer = SummaryWriter(self.exper_path)
         print("Experiment n: "+str(self.seed))
-        self.model = RecurrentAE(self.config,self.device)
-        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False,decimate_factor=config.decimate_factor,scaler=None,data_aug=True)
+        if config.rnn_type == 'Transformer':
+            self.model = TransformerAE(self.config,self.device)
+        else:
+            self.model = RecurrentAE(self.config,self.device)
+
+        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False,decimate_factor=config.decimate_factor,scaler=None,data_aug=False)
         self.val_dataset = KW51('~/Downloads/ambient_csv/test/normal',substract=False,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
         self.val_anomaly_dataset = KW51('~/Downloads/ambient_csv/test/anomaly',substract=False,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
         self.train_dataloader = DataLoader(self.train_dataset,batch_size=config.batch_size,shuffle=True,num_workers=0,drop_last=False)
@@ -80,7 +84,7 @@ class RecurrentAEAgent(BaseAgent):
         self.cuda = self.is_cuda & self.config.cuda
 
         self.model = self.model.to(self.device)
-        summary(self.model, input_size=(config.batch_size,self.train_dataset[0].shape[0],self.train_dataset[0].shape[1]))
+        #summary(self.model, input_size=(config.batch_size,self.train_dataset[0].shape[0],self.train_dataset[0].shape[1]))
         self.loss = self.loss.to(self.device)
 
         # Loading chekpoint
@@ -105,7 +109,10 @@ class RecurrentAEAgent(BaseAgent):
 
     def thres(self,losses,losses_anomaly):
         while(True):
-            threshold = float(input("Scrivere la threshold: "))
+            try:
+                threshold = float(input("Scrivere la threshold: "))
+            except:
+                continue
             correct = sum(l <= threshold for l in losses)
             print("prediction loss is: "+ str( np.asarray(losses).mean()))
             print(f'Correct normal predictions: {correct}/{len(self.val_dataset)}')

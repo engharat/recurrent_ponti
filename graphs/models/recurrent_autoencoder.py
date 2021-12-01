@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 from easydict import EasyDict as edict
 from functools import partial
-
+import math
 
 class RecurrentEncoder(nn.Module):
     """Recurrent encoder"""
@@ -56,10 +56,6 @@ class RecurrentEncoderConvLSTM(nn.Module):
     def __init__(self, n_features, latent_dim, rnn):
         super().__init__()
         self.relu = nn.ReLU()
-        self.conv1 = nn.Conv1d(n_features,n_features*2,kernel_size=3,stride=2, padding=1,bias=True)
-        self.conv2 = nn.Conv1d(n_features*2,n_features*4,kernel_size=3,stride=2, padding=1,bias=True)
-        self.bn1 = nn.BatchNorm1d(n_features*2)
-        self.bn2 = nn.BatchNorm1d(n_features*4)
         self.conv3 = nn.Conv1d(n_features*4,n_features*8,kernel_size=3,stride=2, padding=1,bias=True)
         self.conv4 = nn.Conv1d(n_features*8,n_features*16,kernel_size=3,stride=2, padding=1,bias=True)
         self.bn3 = nn.BatchNorm1d(n_features*8)
@@ -236,7 +232,7 @@ class RecurrentAE(nn.Module):
         h_n,seq_len = self.encoder(x)
         out = self.decoder(h_n, seq_len)
 
-        return torch.flip(out, [1])
+        return out #torch.flip(out, [1])
 
     @staticmethod
     def get_rnn_type(rnn_type, rnn_act=None):
@@ -278,32 +274,135 @@ class RecurrentAE(nn.Module):
         return decoder
 
 
-if __name__ == '__main__':
+class PositionalEncoding(nn.Module):
+    r"""Inject some information about the relative or absolute position of the tokens
+        in the sequence. The positional encodings have the same dimension as
+        the embeddings, so that the two can be summed. Here, we use sine and cosine
+        functions of different frequencies.
+    .. math::
+        \text{PosEncoder}(pos, 2i) = sin(pos/10000^(2i/d_model))
+        \text{PosEncoder}(pos, 2i+1) = cos(pos/10000^(2i/d_model))
+        \text{where pos is the word position and i is the embed idx)
+    Args:
+        d_model: the embed dim (required).
+        dropout: the dropout value (default=0.1).
+        max_len: the max. length of the incoming sequence (default=5000).
+    Examples:
+        >>> pos_encoder = PositionalEncoding(d_model)
+    """
 
-    # Configuration
-    config = {}
-    config['n_features'] = 1
-    config['latent_dim'] = 4
-    config['rnn_type'] = 'GRU'
-    config['rnn_act'] = 'relu'
-    config['device'] = 'cpu'
-    config = edict(config)
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
+        super(PositionalEncoding, self).__init__()
+        self.dropout = nn.Dropout(p=dropout)
 
-    # Adding random data
-    X = torch.tensor([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]], dtype=torch.float32).unsqueeze(2)
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        pe = pe.unsqueeze(0).transpose(0, 1)
+        self.register_buffer('pe', pe)
 
-    # Model
-    model = RecurrentAE(config)
+    def forward(self, x):
+        r"""Inputs of forward function
+        Args:
+            x: the sequence fed to the positional encoder model (required).
+        Shape:
+            x: [sequence length, batch size, embed dim]
+            output: [sequence length, batch size, embed dim]
+        Examples:
+            >>> output = pos_encoder(x)
+        """
 
-    # Encoder
-    h = model.encoder(X)
-    out =  model.decoder(h, seq_len = 10)
-    out = torch.flip(out, [1])
+        x = x + self.pe[:x.size(0), :]
+        return self.dropout(x)
 
-    # Loss
-    loss = nn.L1Loss(reduction = 'mean')
-    l = loss(X, out)
+class TransformerModel(nn.Module):
+    """Container module with an encoder, a recurrent or transformer module, and a decoder."""
+
+    def __init__(self, ntoken, ninp, nhead, nhid, nlayers, dropout=0.5):
+        super(TransformerModel, self).__init__()
+        self.model_type = 'Transformer'
+        self.src_mask = None
+        self.pos_encoder = PositionalEncoding(ninp, 0.0) #instead of 0.0 it was dropout
+        encoder_layers = nn.TransformerEncoderLayer(ninp, nhead, nhid, dropout,batch_first=True)
+        decoder_layers = nn.TransformerDecoderLayer(ninp, nhead, nhid, dropout,batch_first=True)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, nlayers)
+        self.transformer_decoder = nn.TransformerDecoder(decoder_layers, nlayers)
+        #self.encoder = nn.Embedding(ntoken, ninp)
+        self.ninp = ninp
+        self.decoder1 = nn.Linear(ninp, ninp)
+        self.decoder2 = nn.Linear(ninp, ninp)
+
+        self.init_weights()
+
+    def _generate_square_subsequent_mask(self, sz):
+        mask = (torch.triu(torch.ones(sz, sz)) == 1).transpose(0, 1)
+        mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+        return mask
+
+    def init_weights(self):
+        initrange = 0.1
+        nn.init.uniform_(self.decoder1.weight,-initrange,initrange)
+        nn.init.uniform_(self.decoder2.weight,-initrange,initrange)
+
+    def forward(self, src, has_mask=None):
+        if has_mask:
+            device = src.device
+            if self.src_mask is None or self.src_mask.size(0) != len(src):
+                mask = self._generate_square_subsequent_mask(len(src)).to(device)
+                self.src_mask = mask
+        else:
+            self.src_mask = None
+       # src = self.encoder(src) * math.sqrt(self.ninp)
+       # src = self.pos_encoder(src)
+        output = self.transformer_encoder(src, self.src_mask)
+#        output = self.decoder1(output)
+#        output = self.transformer_decoder(src,output)
+#        output = self.decoder2(output)
+        return output
+
+class TransformerAE(nn.Module):
+    """Recurrent autoencoder"""
+
+    def __init__(self, config,device):
+        super().__init__()
+
+        # Encoder and decoder configuration
+        self.config = config
+        seq_len = 512
+        self.transformer = TransformerModel(ntoken=1,ninp=self.config.n_features*4,nhead=2*4,nhid=seq_len//4,nlayers=2,dropout=0.5)
+
+        self.latent_dim = self.config.latent_dim
+        self.n_features = self.config.n_features
+        n_features = self.n_features
+        self.device = device
+
+        self.relu = nn.ReLU()
+        self.conv1 = nn.Conv1d(n_features,n_features*2,kernel_size=3,stride=2, padding=1,bias=True)
+        self.conv2 = nn.Conv1d(n_features*2,n_features*4,kernel_size=3,stride=2, padding=1,bias=True)
+        self.bn1 = nn.BatchNorm1d(n_features*2)
+        self.bn2 = nn.BatchNorm1d(n_features*4)
+        self.bn3 = nn.BatchNorm1d(n_features*2)
+
+        self.deconv1 = nn.ConvTranspose1d(n_features*4,n_features*2,kernel_size=3,stride=2, padding=1,output_padding=1,bias=True)
+        self.deconv2 = nn.ConvTranspose1d(n_features*2,n_features,kernel_size=3,stride=2, padding=1,output_padding=1,bias=True)
+
+    def forward(self, x):
+        x = x.swapaxes(1,2) #now we have on axis 0 the batch, on axis 1 the features and on axis 2 the sequence .
+        x = self.bn1(self.relu(self.conv1(x)))
+        x = self.bn2(self.relu(self.conv2(x)))
+        x = x.swapaxes(1,2) #now we have on axis 0 the batch, on axis 1 the features and on axis 2 the sequence .
+
+        x = self.transformer(x)
+
+        x = x.swapaxes(1,2) #now we have on axis 0 the batch, on axis 1 the features and on axis 2 the sequence .
+        x = self.deconv1(x)
+        x = self.bn3(self.relu(x))
+
+        x = self.deconv2(x)
+        x = x.swapaxes(1,2) #now we have on axis 0 the batch, on axis 1 the features and on axis 2 the sequence .
+ 
+        return x #torch.flip(out, [1])
 
 

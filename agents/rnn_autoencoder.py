@@ -50,9 +50,9 @@ class RecurrentAEAgent(BaseAgent):
         else:
             self.model = RecurrentAE(self.config,self.device)
 
-        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False,decimate_factor=config.decimate_factor,scaler=None,data_aug=False)
-        self.val_dataset = KW51('~/Downloads/ambient_csv/test/normal',substract=False,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
-        self.val_anomaly_dataset = KW51('~/Downloads/ambient_csv/test/anomaly',substract=False,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
+        self.train_dataset = KW51('~/Downloads/ambient_csv/train',substract=False,max_seq_len=config.max_seq_len,decimate_factor=config.decimate_factor,scaler=None,data_aug=False)
+        self.val_dataset = KW51('~/Downloads/ambient_csv/test/normal',substract=False,max_seq_len=config.max_seq_len,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
+        self.val_anomaly_dataset = KW51('~/Downloads/ambient_csv/test/anomaly',substract=False,max_seq_len=config.max_seq_len,decimate_factor=config.decimate_factor,scaler=self.train_dataset.scaler)
         self.train_dataloader = DataLoader(self.train_dataset,batch_size=config.batch_size,shuffle=True,num_workers=0,drop_last=False)
         self.val_dataloader = DataLoader(self.val_dataset,batch_size=config.batch_size,shuffle=False,num_workers=0,drop_last=False)
         self.val_anomaly_dataloader = DataLoader(self.val_anomaly_dataset,batch_size=config.batch_size,shuffle=False,num_workers=0,drop_last=False)
